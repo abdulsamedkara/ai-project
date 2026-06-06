@@ -1,0 +1,22 @@
+# ESP-IDF build
+esp32-firmware/build/
+esp32-firmware/sdkconfig
+esp32-firmware/managed_components/
+esp32-firmware/dependencies.lock
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Learned state (runtime generated)
+smartlab-peas/learned_state.json
+
+# VS Code
+.vscode/settings.json
+
+# OS
+.DS_Store
+Thumbs.db

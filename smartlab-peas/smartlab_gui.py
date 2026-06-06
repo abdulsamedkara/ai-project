@@ -10,7 +10,7 @@ Features:
   - Live environment, sensor, analysis, decision, actuator panels
   - ARMED / DISARMED mode toggle
   - Step-by-step and Auto-run modes
-  - Performance metrics with learning indicator
+  - Performance metrics with EMA-based learning indicator
 
 Run: python smartlab_gui.py
 
@@ -25,8 +25,8 @@ import time
 import threading
 
 from smartlab_agent import (
-    LabEnvironment, Sensors, RealSensors, Preprocessor,
-    Analyzer, Actuators, SmartLabAgent, SERVER_HOST, SERVER_PORT
+    LabEnvironment, Sensors, RealSensors, RealActuators, Preprocessor,
+    Analyzer, Actuators, SmartLabAgent, ESP32_HOST
 )
 
 
@@ -101,25 +101,26 @@ class GUIActuators(Actuators):
 # ─────────────────────────────────────────────
 
 class SmartLabGUI:
-    BG   = "#1e1e2e"
-    BG2  = "#181825"
-    FG   = "#cdd6f4"
+    BG    = "#1e1e2e"
+    BG2   = "#181825"
+    FG    = "#cdd6f4"
     MUTED = "#6c7086"
 
     def __init__(self, root):
         self.root = root
         self.root.title("SmartLab Assistant — AI Agent (PEAS)")
-        self.root.geometry("900x760")
+        self.root.geometry("940x700")
         self.root.configure(bg=self.BG)
-        self.root.resizable(False, False)
+        self.root.resizable(True, True)
 
-        self.env          = LabEnvironment()
-        self.sensors      = Sensors()
-        self.real_sensors = RealSensors()
-        self.preprocessor = Preprocessor()
-        self.analyzer     = Analyzer()
-        self.agent        = SmartLabAgent()
-        self.actuators    = GUIActuators(self)
+        self.env             = LabEnvironment()
+        self.sensors         = Sensors()
+        self.real_sensors    = RealSensors()
+        self.real_actuators  = RealActuators()
+        self.preprocessor    = Preprocessor()
+        self.analyzer        = Analyzer()
+        self.agent           = SmartLabAgent()
+        self.actuators       = GUIActuators(self)
 
         self.step_count   = 0
         self.auto_running = False
@@ -128,18 +129,18 @@ class SmartLabGUI:
         self._build_ui()
 
     def _frame(self, parent, title, color):
-        return tk.LabelFrame(parent, text=f"  {title}  ",
-                             font=("Consolas", 9, "bold"),
+        return tk.LabelFrame(parent, text=f" {title} ",
+                             font=("Consolas", 8, "bold"),
                              fg=color, bg=self.BG2,
                              bd=1, relief="solid",
-                             labelanchor="n", padx=6, pady=4)
+                             labelanchor="n", padx=4, pady=1)
 
     def _row(self, parent, label, var, color):
         f = tk.Frame(parent, bg=self.BG2)
         f.pack(fill="x")
-        tk.Label(f, text=f"{label:<18}", font=("Consolas", 9),
+        tk.Label(f, text=f"{label:<20}", font=("Consolas", 8),
                  fg=self.MUTED, bg=self.BG2).pack(side="left")
-        lbl = tk.Label(f, textvariable=var, font=("Consolas", 9, "bold"),
+        lbl = tk.Label(f, textvariable=var, font=("Consolas", 8, "bold"),
                        fg=color, bg=self.BG2, anchor="w", wraplength=300)
         lbl.pack(side="left", fill="x")
         return lbl
@@ -147,15 +148,15 @@ class SmartLabGUI:
     def _build_ui(self):
         tk.Label(self.root,
                  text="SmartLab Assistant — AI Agent (PEAS Framework)",
-                 font=("Consolas", 12, "bold"),
-                 fg="#cba6f7", bg=self.BG).pack(pady=(10, 0))
+                 font=("Consolas", 11, "bold"),
+                 fg="#cba6f7", bg=self.BG).pack(pady=(5, 0))
         tk.Label(self.root,
                  text="Abdül Samed Kara  |  Mert Abdullahoğlu  |  RTEU Computer Engineering",
-                 font=("Consolas", 9), fg=self.MUTED, bg=self.BG).pack(pady=(0, 6))
+                 font=("Consolas", 8), fg=self.MUTED, bg=self.BG).pack(pady=(0, 3))
 
         # Control bar
         mode_bar = tk.Frame(self.root, bg=self.BG)
-        mode_bar.pack(fill="x", padx=12, pady=(0, 4))
+        mode_bar.pack(fill="x", padx=12, pady=(0, 2))
 
         tk.Label(mode_bar, text="System Mode:", font=("Consolas", 9, "bold"),
                  fg=self.FG, bg=self.BG).pack(side="left", padx=(0, 6))
@@ -169,7 +170,6 @@ class SmartLabGUI:
                   relief="flat", cursor="hand2",
                   command=self.toggle_mode).pack(side="left", padx=10)
 
-        # Real/Sim toggle
         tk.Label(mode_bar, text="|", fg=self.MUTED, bg=self.BG).pack(side="left", padx=4)
         tk.Label(mode_bar, text="Data Source:", font=("Consolas", 9, "bold"),
                  fg=self.FG, bg=self.BG).pack(side="left", padx=(0, 6))
@@ -192,7 +192,7 @@ class SmartLabGUI:
 
         # ── PERCEIVE ──
         p = self._frame(left, "STEP 2 — PERCEIVE (Sensors)", "#89b4fa")
-        p.pack(fill="x", pady=3)
+        p.pack(fill="x", pady=2)
         self.raw_rfid_var  = tk.StringVar(value="—")
         self.raw_smoke_var = tk.StringVar(value="—")
         self.raw_temp_var  = tk.StringVar(value="—")
@@ -205,7 +205,7 @@ class SmartLabGUI:
 
         # ── PREPROCESS ──
         pp = self._frame(left, "STEP 3 — PREPROCESS", "#89dceb")
-        pp.pack(fill="x", pady=3)
+        pp.pack(fill="x", pady=2)
         self.pp_smoke_var = tk.StringVar(value="—")
         self.pp_temp_var  = tk.StringVar(value="—")
         self.pp_flame_var = tk.StringVar(value="—")
@@ -216,7 +216,7 @@ class SmartLabGUI:
 
         # ── ANALYZE ──
         an = self._frame(left, "STEP 4 — ANALYZE", "#a6e3a1")
-        an.pack(fill="x", pady=3)
+        an.pack(fill="x", pady=2)
         self.an_identity_var = tk.StringVar(value="—")
         self.an_security_var = tk.StringVar(value="—")
         self.an_smoke_var    = tk.StringVar(value="—")
@@ -229,15 +229,15 @@ class SmartLabGUI:
 
         # ── DECIDE ──
         dc = self._frame(left, "STEP 5 — DECIDE", "#f38ba8")
-        dc.pack(fill="x", pady=3)
+        dc.pack(fill="x", pady=2)
         self.decision_var = tk.StringVar(value="—")
         self.threat_var   = tk.StringVar(value="—")
-        d_row1 = self._row(dc, "Actions", self.decision_var, "#f38ba8")
+        self._row(dc, "Actions", self.decision_var, "#f38ba8")
         self.threat_lbl = self._row(dc, "Threat detected", self.threat_var, "#f38ba8")
 
         # ── ACTUATORS ──
         ac = self._frame(right, "STEP 6 — ACT (Actuators)", "#fab387")
-        ac.pack(fill="x", pady=3)
+        ac.pack(fill="x", pady=2)
         self.fan_var     = tk.StringVar(value="—")
         self.tft_var     = tk.StringVar(value="—")
         self.rfid_var    = tk.StringVar(value="—")
@@ -252,18 +252,26 @@ class SmartLabGUI:
         self.web_label     = self._row(ac, "Web UI", self.web_var, "#6c7086")
 
         # ── LEARN ──
-        lrn = self._frame(right, "STEP 7 — LEARN", "#cba6f7")
-        lrn.pack(fill="x", pady=3)
-        self.learn_var  = tk.StringVar(value="No adjustments yet")
-        self.streak_var = tk.StringVar(value="0")
-        self.adj_var    = tk.StringVar(value="0")
-        self._row(lrn, "Status", self.learn_var, "#cba6f7")
-        self._row(lrn, "False alarm streak", self.streak_var, "#fab387")
-        self._row(lrn, "Threshold adj", self.adj_var, "#a6e3a1")
+        lrn = self._frame(right, "STEP 7 — LEARN  (EMA Adaptive)", "#cba6f7")
+        lrn.pack(fill="x", pady=2)
+        self.learn_var        = tk.StringVar(value="No adjustments yet")
+        self.streak_var       = tk.StringVar(value="0")
+        self.smoke_mean_var   = tk.StringVar(value="—")
+        self.smoke_mod_var    = tk.StringVar(value="—")
+        self.smoke_dan_var    = tk.StringVar(value="—")
+        self.temp_mean_var    = tk.StringVar(value="—")
+        self.temp_thresh_var  = tk.StringVar(value="—")
+        self._row(lrn, "Status",            self.learn_var,       "#cba6f7")
+        self._row(lrn, "False alarm streak", self.streak_var,     "#fab387")
+        self._row(lrn, "Smoke baseline",    self.smoke_mean_var,  "#89b4fa")
+        self._row(lrn, "Smoke mod thresh",  self.smoke_mod_var,   "#fab387")
+        self._row(lrn, "Smoke dan thresh",  self.smoke_dan_var,   "#f38ba8")
+        self._row(lrn, "Temp baseline",     self.temp_mean_var,   "#89b4fa")
+        self._row(lrn, "Temp high thresh",  self.temp_thresh_var, "#fab387")
 
         # ── PERFORMANCE ──
         pf = self._frame(right, "PERFORMANCE  (P)", "#f9e2af")
-        pf.pack(fill="x", pady=3)
+        pf.pack(fill="x", pady=2)
         self.perf_correct_var  = tk.StringVar(value="0")
         self.perf_false_var    = tk.StringVar(value="0")
         self.perf_missed_var   = tk.StringVar(value="0")
@@ -278,12 +286,12 @@ class SmartLabGUI:
         # ── BUTTONS ──
         self.step_var = tk.StringVar(value="Step: 0")
         tk.Label(self.root, textvariable=self.step_var,
-                 font=("Consolas", 10, "bold"), fg="#cba6f7", bg=self.BG).pack(pady=(4, 0))
+                 font=("Consolas", 9, "bold"), fg="#cba6f7", bg=self.BG).pack(pady=(2, 0))
 
         btn_f = tk.Frame(self.root, bg=self.BG)
-        btn_f.pack(pady=8)
-        bs = {"font": ("Consolas", 10, "bold"), "width": 16,
-              "relief": "flat", "cursor": "hand2", "pady": 5}
+        btn_f.pack(pady=4)
+        bs = {"font": ("Consolas", 9, "bold"), "width": 16,
+              "relief": "flat", "cursor": "hand2", "pady": 3}
 
         tk.Button(btn_f, text="▶  Run Step", command=self.run_step,
                   bg="#313244", fg=self.FG, activebackground="#45475a", **bs
@@ -299,6 +307,9 @@ class SmartLabGUI:
                   bg="#313244", fg=self.FG, activebackground="#45475a", **bs
                   ).pack(side="left", padx=5)
 
+        # Show initial learned thresholds (from loaded state)
+        self._refresh_learn()
+
     def toggle_mode(self):
         mode = "DISARMED" if self.agent.system_mode == "ARMED" else "ARMED"
         self.agent.set_mode(mode)
@@ -308,7 +319,7 @@ class SmartLabGUI:
     def toggle_source(self):
         self.use_real = not self.use_real
         if self.use_real:
-            self.source_var.set(f"REAL  ({SERVER_HOST}:{SERVER_PORT})")
+            self.source_var.set(f"REAL  ({ESP32_HOST})")
             self.source_lbl.config(fg="#a6e3a1")
         else:
             self.source_var.set("SIMULATION")
@@ -334,8 +345,8 @@ class SmartLabGUI:
         self.raw_mot_var.set(str(raw["motion_raw"]))
         self.raw_flame_var.set(str(raw["flame_raw"]))
 
-        # Step 3: Preprocess
-        processed = self.preprocessor.process(raw)
+        # Step 3: Preprocess (uses learned thresholds)
+        processed = self.preprocessor.process(raw, self.agent.learner)
         self.pp_smoke_var.set(processed["smoke_level"])
         self.pp_temp_var.set(str(processed["temp_high"]))
         self.pp_flame_var.set(str(processed["flame"]))
@@ -354,29 +365,46 @@ class SmartLabGUI:
         self.threat_var.set("THREAT DETECTED" if threat else "Normal — No Threat")
         self.threat_lbl.config(fg="#f38ba8" if threat else "#a6e3a1")
 
-        # Step 6: Act
+        # Step 6: Act — GUI her zaman güncellenir; gerçek modda ESP32'ye de gönderilir
         for action in actions:
             getattr(self.actuators, action[0])(*action[1:])
+            if self.use_real:
+                hw_method = getattr(self.real_actuators, action[0], None)
+                if hw_method:
+                    hw_method(*action[1:])
 
-        # Step 7: Learn
-        prev_adj = self.agent.smoke_threshold_adj
-        self.agent.learn(analysis, threat)
-        if self.agent.smoke_threshold_adj > prev_adj:
-            self.learn_var.set("Threshold raised — reducing false alarms")
-        elif self.agent.false_alarm_streak > 0:
-            self.learn_var.set(f"False alarm streak: {self.agent.false_alarm_streak}")
-        else:
-            self.learn_var.set("No adjustments needed")
-        self.streak_var.set(str(self.agent.false_alarm_streak))
-        self.adj_var.set(f"+{self.agent.smoke_threshold_adj}")
+        # Step 7: Learn (EMA update + persist)
+        self.agent.learn(analysis, threat, processed)
+        self._refresh_learn()
 
         # Performance
         self.agent.update_performance(analysis, threat)
         self._refresh_perf()
 
+    def _refresh_learn(self):
+        """Update the Learn panel with current EMA values."""
+        lrn = self.agent.learner
+        streak = self.agent.false_alarm_streak
+
+        if lrn.thresholds:
+            self.smoke_mean_var.set(f"{lrn.means['smoke']:.0f} ADC")
+            self.smoke_mod_var.set(f"≥ {lrn.thresholds['smoke_moderate']:.0f} ADC")
+            self.smoke_dan_var.set(f"≥ {lrn.thresholds['smoke_dangerous']:.0f} ADC")
+            self.temp_mean_var.set(f"{lrn.means['temperature']:.1f} °C")
+            self.temp_thresh_var.set(f"≥ {lrn.thresholds['temp_high']:.1f} °C")
+
+        self.streak_var.set(str(streak))
+
+        if streak >= 3:
+            self.learn_var.set("Adjusting thresholds (false alarm streak)")
+        elif streak > 0:
+            self.learn_var.set(f"False alarm streak: {streak}")
+        else:
+            self.learn_var.set("EMA updating — no streak")
+
     def _refresh_perf(self):
-        a = self.agent
-        t = a.total_steps
+        a   = self.agent
+        t   = a.total_steps
         acc = ((a.correct_detections + a.correct_ignores) / t * 100) if t > 0 else 0
         self.perf_correct_var.set(str(a.correct_detections))
         self.perf_false_var.set(str(a.false_alarms))
@@ -407,15 +435,13 @@ class SmartLabGUI:
         self.mode_var.set("ARMED")
         self.mode_lbl.config(fg="#f38ba8")
         self.actuators.reset_all()
-        self.learn_var.set("No adjustments yet")
-        self.streak_var.set("0")
-        self.adj_var.set("0")
         for var in [self.raw_rfid_var, self.raw_smoke_var, self.raw_temp_var,
                     self.raw_mot_var, self.raw_flame_var, self.pp_smoke_var,
                     self.pp_temp_var, self.pp_flame_var, self.an_identity_var,
                     self.an_security_var, self.an_smoke_var, self.an_thermal_var,
                     self.decision_var, self.threat_var]:
             var.set("—")
+        self._refresh_learn()
         self._refresh_perf()
 
 

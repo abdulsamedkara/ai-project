@@ -25,22 +25,34 @@ python -X utf8 smartlab_gui.py            # GUI (toggle real/sim inside)
 ```
 
 ## Real Hardware Config
-- SERVER_HOST = "10.162.138.176" — config.h ile aynı IP
-- SERVER_PORT = 8080
-- Değişirse smartlab_agent.py başındaki SERVER_HOST'u güncelle
-- Server çalışmalı: `uvicorn main:app --host 0.0.0.0 --port 8080`
-- ESP32 aynı WiFi'da bağlı olmalı
+- ESP32_HOST = "10.162.138.176" — ESP32'nin WiFi IP'si (config.h WIFI_SSID/PASSWORD ile aynı ağ)
+- Değişirse smartlab_agent.py başındaki ESP32_HOST'u güncelle
+- ARA SUNUCU YOK — Python doğrudan ESP32'ye bağlanır (port 80)
+- ESP32 aynı WiFi'da olmalı; firmware yüklenmiş olmalı
+
+## Mimari (Yeni — Ara Sunucu Yok)
+```
+ESP32 (HTTP server :80)
+  GET  /sensors  → {temperature, humidity, smoke, ldr, pir, flame, vib}
+  GET  /status   → {username, rfid_scanned}
+  POST /fan      → {"speed": 0-100}
+  POST /led      → {"brightness": 0-100}
+      ↕ urllib.request (stdlib)
+smartlab_agent.py / smartlab_gui.py
+  RealSensors   — pollar /sensors + /status
+  RealActuators — POST /fan + /led
+```
 
 ## RealSensors Data Mapping (ESP32 → Agent)
-| ESP32 field | Agent field       | Notes                          |
-|-------------|-------------------|--------------------------------|
-| smoke       | smoke_adc         | raw ADC 0-4095                 |
-| temperature | temperature_c     | float °C                       |
-| pir         | motion_raw        | 1=motion, 0=none               |
-| flame       | flame_raw         | 0=fire (LOW=fire), 1=safe      |
-| vib         | vibration         | 1=vibration, 0=none            |
-| ldr         | light_adc         | >3000=bright >1500=dim else dark|
-| username    | user_name+rfid_raw| "Misafir"→none, "Bilinmeyen"→unauth|
+| ESP32 field  | Agent field       | Notes                           |
+|--------------|-------------------|---------------------------------|
+| smoke        | smoke_adc         | raw ADC 0-4095                  |
+| temperature  | temperature_c     | float °C                        |
+| pir          | motion_raw        | 1=motion, 0=none                |
+| flame        | flame_raw         | 0=fire (LOW=fire), 1=safe       |
+| vib          | vibration         | 1=vibration, 0=none             |
+| ldr          | light_adc         | >3000=bright >1500=dim else dark|
+| username     | user_name+rfid_raw| "Misafir"→none, "Bilinmeyen"→unauth|
 
 ## Algorithm Flow (7 Steps — hocanın istediği)
 1. Initialize  → authorized users, ARMED/DISARMED mode, thresholds
