@@ -38,7 +38,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 # ─── ESP32 config — update if DHCP IP changes ────────────────────────────────
 # ESP32, HTTP sunucusu olarak çalışır; Python doğrudan buraya bağlanır.
 # Endpoints: GET /sensors  GET /status  POST /fan  POST /led
-ESP32_HOST         = "10.162.138.176"   # ESP32'nin WiFi IP'si
+ESP32_HOST         = "10.162.138.1"   # ESP32'nin WiFi IP'si
 LEARNED_STATE_FILE = "learned_state.json"
 
 
@@ -77,7 +77,6 @@ class LabEnvironment:
             "user_name"   : user_name,
             "smoke_level" : random.choice(self.smoke_levels),
             "temperature" : random.choice(self.temp_levels),
-            "motion"      : random.choice([True, False]),
             "flame"       : random.choices([True, False], weights=[1, 9])[0],
             "vibration"   : random.choice([True, False]),
             "light_level" : random.choice(self.light_levels),
@@ -111,7 +110,6 @@ class Sensors:
                             [env_state["smoke_level"]] + random.randint(-50, 50),
             "temperature_c": 28.5 if env_state["temperature"] == "high" else 22.0
                             + random.uniform(-0.5, 0.5),
-            "motion_raw"  : env_state["motion"],
             "flame_raw"   : env_state["flame"],
             "vibration"   : env_state["vibration"],
             "light_adc"   : {"bright": 3200, "dim": 2000, "dark": 800}
@@ -189,7 +187,6 @@ class RealSensors:
                 "user_name"    : username,
                 "smoke_adc"    : sensors.get("smoke", 400),
                 "temperature_c": float(sensors.get("temperature") or 22.0),
-                "motion_raw"   : sensors.get("pir", 0) == 1,
                 "flame_raw"    : flame,
                 "vibration"    : sensors.get("vib", 0) == 1,
                 "light_adc"    : ldr,
@@ -343,7 +340,6 @@ class Preprocessor:
             ),
             "temperature_c"  : round(raw["temperature_c"], 1),
             "temp_high"      : raw["temperature_c"] >= temp_thresh,
-            "motion"         : raw["motion_raw"],
             "flame"          : raw["flame_raw"],
             "vibration"      : raw["vibration"],
             "light_adc"      : max(0, min(4095, raw["light_adc"])),
@@ -375,10 +371,8 @@ class Analyzer:
 
         if processed["flame"]:
             security_class = "fire_emergency"
-        elif identity_class == "unauthorized_user" and processed["motion"]:
-            security_class = "intrusion"
         elif identity_class == "unauthorized_user":
-            security_class = "unauthorized_access"
+            security_class = "intrusion"
         elif smoke_class == "dangerous":
             security_class = "hazard"
         else:
@@ -396,7 +390,6 @@ class Analyzer:
             "thermal_class"  : thermal_class,
             "security_class" : security_class,
             "env_class"      : env_class,
-            "motion"         : processed["motion"],
             "flame"          : processed["flame"],
             "light_level"    : processed["light_level"],
             "temp_high"      : processed["temp_high"],
@@ -602,8 +595,6 @@ class SmartLabAgent:
             actions.append(("access_denied",))
             actions.append(("tft_alert", "UNAUTHORIZED ACCESS ATTEMPT"))
             actions.append(("web_notify", f"Unauthorized user: {analysis['user_name']}"))
-            if analysis["motion"]:
-                actions.append(("speaker_alert", "Unauthorized motion detected in lab!"))
             threat = True
 
         # Priority 6: LED control

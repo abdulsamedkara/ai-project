@@ -100,7 +100,6 @@ static volatile int  g_temp         = 0;
 static volatile int  g_hum          = 0;
 static volatile int  g_smoke        = 0;
 static volatile int  g_ldr          = 0;
-static volatile int  g_pir          = 0;
 static volatile int  g_flame        = 1;   // 1 = güvenli (aktif LOW sensör)
 static volatile int  g_vib          = 0;
 static char          g_username[64] = "Misafir";
@@ -114,8 +113,8 @@ static volatile screen_id_t g_active_screen = SCREEN_IDLE;
 static void refresh_sensors_screen(void)
 {
     char msg[48];
-    snprintf(msg, sizeof(msg), "%d %d %d %d %d %d",
-             g_temp, g_hum, g_smoke, g_pir, g_flame, g_ldr);
+    snprintf(msg, sizeof(msg), "%d %d %d %d %d",
+             g_temp, g_hum, g_smoke, g_flame, g_ldr);
     display_switch(SCREEN_SENSORS, msg);
     g_active_screen = SCREEN_SENSORS;
 }
@@ -200,8 +199,8 @@ static void fast_sensor_task(void *arg)
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type    = GPIO_INTR_DISABLE,
     };
-    // PIR + VIB
-    io.pin_bit_mask = (1ULL << PIR_GPIO) | (1ULL << VIB_GPIO);
+    // VIB
+    io.pin_bit_mask = 1ULL << VIB_GPIO;
     gpio_config(&io);
     // Flame — pull-up (aktif LOW)
     io.pin_bit_mask = 1ULL << FLAME_GPIO;
@@ -216,7 +215,6 @@ static void fast_sensor_task(void *arg)
     int  sensor_tick       = 0;      // periyodik ekran güncelleme sayacı
 
     while (1) {
-        g_pir   = gpio_get_level(PIR_GPIO);
         g_flame = gpio_get_level(FLAME_GPIO);
         g_vib   = gpio_get_level(VIB_GPIO);
 
@@ -267,9 +265,9 @@ static esp_err_t h_sensors(httpd_req_t *req)
     snprintf(json, sizeof(json),
         "{\"temperature\":%d,\"humidity\":%d,"
         "\"smoke\":%d,\"ldr\":%d,"
-        "\"pir\":%d,\"flame\":%d,\"vib\":%d}",
+        "\"flame\":%d,\"vib\":%d}",
         g_temp, g_hum, g_smoke, g_ldr,
-        g_pir, g_flame, g_vib);
+        g_flame, g_vib);
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, json, HTTPD_RESP_USE_STRLEN);
     return ESP_OK;

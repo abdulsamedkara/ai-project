@@ -196,11 +196,15 @@ class SmartLabGUI:
         self.raw_rfid_var  = tk.StringVar(value="—")
         self.raw_smoke_var = tk.StringVar(value="—")
         self.raw_temp_var  = tk.StringVar(value="—")
-        self.raw_mot_var   = tk.StringVar(value="—")
         self.raw_flame_var = tk.StringVar(value="—")
-        for lbl, var in [("RFID raw", self.raw_rfid_var), ("Smoke ADC", self.raw_smoke_var),
-                         ("Temperature", self.raw_temp_var), ("Motion raw", self.raw_mot_var),
-                         ("Flame raw", self.raw_flame_var)]:
+        self.raw_ldr_var   = tk.StringVar(value="—")
+        self.raw_vib_var   = tk.StringVar(value="—")
+        for lbl, var in [("RFID raw",    self.raw_rfid_var),
+                         ("Smoke ADC",   self.raw_smoke_var),
+                         ("Temperature", self.raw_temp_var),
+                         ("Flame raw",   self.raw_flame_var),
+                         ("LDR (light)", self.raw_ldr_var),
+                         ("Vibration",   self.raw_vib_var)]:
             self._row(p, lbl, var, "#89b4fa")
 
         # ── PREPROCESS ──
@@ -342,8 +346,9 @@ class SmartLabGUI:
         self.raw_rfid_var.set(raw["rfid_raw"])
         self.raw_smoke_var.set(str(raw["smoke_adc"]))
         self.raw_temp_var.set(f"{raw['temperature_c']:.1f}°C")
-        self.raw_mot_var.set(str(raw["motion_raw"]))
         self.raw_flame_var.set(str(raw["flame_raw"]))
+        self.raw_ldr_var.set(f"{raw['light_adc']}  ({raw['light_level']})")
+        self.raw_vib_var.set(str(raw["vibration"]))
 
         # Step 3: Preprocess (uses learned thresholds)
         processed = self.preprocessor.process(raw, self.agent.learner)
@@ -436,7 +441,8 @@ class SmartLabGUI:
         self.mode_lbl.config(fg="#f38ba8")
         self.actuators.reset_all()
         for var in [self.raw_rfid_var, self.raw_smoke_var, self.raw_temp_var,
-                    self.raw_mot_var, self.raw_flame_var, self.pp_smoke_var,
+                    self.raw_flame_var, self.raw_ldr_var,
+                    self.raw_vib_var, self.pp_smoke_var,
                     self.pp_temp_var, self.pp_flame_var, self.an_identity_var,
                     self.an_security_var, self.an_smoke_var, self.an_thermal_var,
                     self.decision_var, self.threat_var]:

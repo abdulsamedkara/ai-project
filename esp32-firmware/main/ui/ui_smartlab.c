@@ -240,19 +240,19 @@ void ui_smartlab_show(screen_id_t id, const char *msg)
     // Sensors screen: live sensor data grid
     // msg format: "temp hum smoke pir flame ldr"
     case SCREEN_SENSORS: {
-        int s_temp=0, s_hum=0, s_smoke=0, s_pir=0, s_flame=1, s_ldr=0;
-        if (msg) sscanf(msg, "%d %d %d %d %d %d",
-                        &s_temp, &s_hum, &s_smoke, &s_pir, &s_flame, &s_ldr);
+        int s_temp=0, s_hum=0, s_smoke=0, s_flame=1, s_ldr=0;
+        if (msg) sscanf(msg, "%d %d %d %d %d",
+                        &s_temp, &s_hum, &s_smoke, &s_flame, &s_ldr);
 
         const char *light_str = s_ldr > 3000 ? "BRIGHT"
                                : s_ldr > 1500 ? "DIM" : "DARK";
 
-        const char *labels[6] = {
+        const char *labels[5] = {
             "Temperature", "Humidity", "Smoke ADC",
-            "Light", "Motion", "Flame"
+            "Light", "Flame"
         };
-        char vals[6][20];
-        lv_color_t colors[6];
+        char vals[5][20];
+        lv_color_t colors[5];
 
         snprintf(vals[0], 20, "%d C",   s_temp);
         colors[0] = (s_temp >= 27) ? CLR_YELLOW : CLR_GREEN;
@@ -267,16 +267,13 @@ void ui_smartlab_show(screen_id_t id, const char *msg)
         snprintf(vals[3], 20, "%s",     light_str);
         colors[3] = CLR_CYAN;
 
-        snprintf(vals[4], 20, "%s",     s_pir   ? "MOTION" : "CLEAR");
-        colors[4] = s_pir ? CLR_YELLOW : CLR_GREEN;
-
-        snprintf(vals[5], 20, "%s",     (s_flame == 0) ? "FIRE!" : "SAFE");
-        colors[5] = (s_flame == 0) ? CLR_RED : CLR_GREEN;
+        snprintf(vals[4], 20, "%s",     (s_flame == 0) ? "FIRE!" : "SAFE");
+        colors[4] = (s_flame == 0) ? CLR_RED : CLR_GREEN;
 
         draw_header("SENSORS", CLR_CYAN);
 
-        for (int i = 0; i < 6; i++) {
-            int y = 44 + i * 44;
+        for (int i = 0; i < 5; i++) {
+            int y = 44 + i * 50;
 
             // Alternating row background
             if (i % 2 == 0) {

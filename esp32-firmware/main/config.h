@@ -61,9 +61,6 @@
 // PTT Button (BOOT butonu — GPIO 0, active LOW)
 #define PTT_GPIO            0
 
-// PIR
-#define PIR_GPIO            5
-
 // Flame Sensor
 #define FLAME_GPIO          48
 
