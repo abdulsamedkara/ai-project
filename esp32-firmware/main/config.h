@@ -34,10 +34,10 @@
 #define SMOKE_AOUT_GPIO     4
 #define SMOKE_DOUT_GPIO     14
 #define SMOKE_ADC_CHANNEL   ADC_CHANNEL_3
-#define SMOKE_ADC_CLEAR     800
-#define SMOKE_ADC_HALF      1500
-#define SMOKE_ADC_FULL      2000
-#define SMOKE_WARMUP_MS     30000
+#define SMOKE_ADC_CLEAR     1000
+#define SMOKE_ADC_HALF      1600
+#define SMOKE_ADC_FULL      2300
+#define SMOKE_WARMUP_MS     10000
 #define SMOKE_SAMPLE_COUNT  32
 
 // L298N Fan
@@ -66,6 +66,9 @@
 
 // SW-420 Vibration
 #define VIB_GPIO            1
+
+// Buzzer (aktif buzzer, GPIO HIGH = açık)
+#define BUZZER_GPIO         2
 
 // LED Strip
 #define LED_ENB_GPIO        38

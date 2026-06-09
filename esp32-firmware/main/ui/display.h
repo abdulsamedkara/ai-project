@@ -9,6 +9,7 @@ typedef enum {
     SCREEN_READY,         // Access granted — welcome screen (msg = username)
     SCREEN_SENSORS,       // Live sensor data grid (msg = "temp hum smoke pir flame ldr")
     SCREEN_SMOKE_ALERT,   // Critical alert state triggered by smoke detection
+    SCREEN_FIRE_ALERT,    // Critical alert state triggered by flame detection
     SCREEN_ERROR,         // System error state displaying error messages
 } screen_id_t;
 

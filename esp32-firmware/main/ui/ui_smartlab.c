@@ -8,6 +8,13 @@
 #include <string.h>
 #include <stdio.h>
 
+static char s_ip[24] = "";
+
+void ui_smartlab_set_ip(const char *ip)
+{
+    if (ip) snprintf(s_ip, sizeof(s_ip), "%s", ip);
+}
+
 // Color palette definitions for UI elements
 #define CLR_BG       lv_color_hex(0x0A0A0F)   // Main background color
 #define CLR_SURF     lv_color_hex(0x12121E)   // Card surface color
@@ -178,7 +185,12 @@ void ui_smartlab_show(screen_id_t id, const char *msg)
                                 msg ? msg : "Waiting for ID card...");
         lv_obj_align(sub, LV_ALIGN_CENTER, 0, 58);
 
-        draw_footer("v2.0  |  IoT Lab", CLR_GREY);
+        char ip_buf[32];
+        if (s_ip[0])
+            snprintf(ip_buf, sizeof(ip_buf), LV_SYMBOL_WIFI "  %s", s_ip);
+        else
+            snprintf(ip_buf, sizeof(ip_buf), "v2.0  |  SmartLab");
+        draw_footer(ip_buf, s_ip[0] ? CLR_CYAN : CLR_GREY);
         break;
     }
 
@@ -326,6 +338,39 @@ void ui_smartlab_show(screen_id_t id, const char *msg)
         lv_obj_align(sub, LV_ALIGN_CENTER, 0, 52);
 
         // Bold red warning stripe at the bottom
+        lv_obj_t *warn_bar = mk_box(scr, 240, 26, CLR_RED, 0);
+        lv_obj_align(warn_bar, LV_ALIGN_BOTTOM_MID, 0, 0);
+        lv_obj_t *warn_lbl = lv_label_create(warn_bar);
+        lv_obj_set_style_text_font(warn_lbl, &lv_font_montserrat_16, 0);
+        lv_obj_set_style_text_color(warn_lbl, CLR_WHITE, 0);
+        lv_obj_set_style_bg_opa(warn_lbl, LV_OPA_TRANSP, 0);
+        lv_label_set_text(warn_lbl, "EVACUATE THE AREA!");
+        lv_obj_center(warn_lbl);
+        break;
+    }
+
+    // Fire alert state: critical warning triggered by flame sensor
+    case SCREEN_FIRE_ALERT: {
+        draw_header("! FIRE !", CLR_RED);
+
+        lv_obj_t *fire_bg = mk_box(scr, 240, 282, lv_color_hex(0x100400), 0);
+        lv_obj_align(fire_bg, LV_ALIGN_BOTTOM_MID, 0, 0);
+
+        lv_obj_t *bg_card = mk_card(scr, 200, 200, lv_color_hex(0x1A0500), CLR_RED, 16);
+        lv_obj_set_style_border_opa(bg_card, LV_OPA_80, 0);
+        lv_obj_align(bg_card, LV_ALIGN_CENTER, 0, 10);
+
+        draw_icon_circle(lv_color_hex(0x200800), CLR_RED,
+                         LV_SYMBOL_WARNING, CLR_YELLOW, -35);
+
+        lv_obj_t *title = mk_lbl(scr, &lv_font_montserrat_20, CLR_RED,
+                                  "FIRE DETECTED!");
+        lv_obj_align(title, LV_ALIGN_CENTER, 0, 25);
+
+        lv_obj_t *sub = mk_lbl(scr, &lv_font_montserrat_16, CLR_YELLOW,
+                                msg ? msg : "Flame sensor active");
+        lv_obj_align(sub, LV_ALIGN_CENTER, 0, 52);
+
         lv_obj_t *warn_bar = mk_box(scr, 240, 26, CLR_RED, 0);
         lv_obj_align(warn_bar, LV_ALIGN_BOTTOM_MID, 0, 0);
         lv_obj_t *warn_lbl = lv_label_create(warn_bar);

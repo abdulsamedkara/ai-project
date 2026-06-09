@@ -30,9 +30,13 @@
 #include "fan_control.h"
 #include "led_strip_ctrl.h"
 #include "dht11.h"
+#include "buzzer.h"
 #include "ui/display.h"
+#include "ui/ui_smartlab.h"
 
 static const char *TAG = "main";
+
+static char g_ip_str[24] = "No IP";
 
 // ─── WiFi ─────────────────────────────────────────────────────────────────────
 
@@ -56,7 +60,9 @@ static void wifi_event_handler(void *arg, esp_event_base_t base,
         }
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *ev = (ip_event_got_ip_t *)data;
-        ESP_LOGI(TAG, "IP: " IPSTR, IP2STR(&ev->ip_info.ip));
+        snprintf(g_ip_str, sizeof(g_ip_str), IPSTR, IP2STR(&ev->ip_info.ip));
+        ui_smartlab_set_ip(g_ip_str);
+        ESP_LOGI(TAG, "IP: %s", g_ip_str);
         s_retry = 0;
         xEventGroupSetBits(s_wifi_eg, WIFI_CONNECTED_BIT);
     }
@@ -104,7 +110,9 @@ static volatile int  g_flame        = 1;   // 1 = güvenli (aktif LOW sensör)
 static volatile int  g_vib          = 0;
 static char          g_username[64] = "Misafir";
 static volatile bool g_rfid_scanned = false;
-static volatile int  g_led_auto     = 1;
+static volatile int     g_led_auto       = 1;
+static volatile uint8_t g_fan_target     = 0;   // istenen duty (tüm tasklar yazar)
+static volatile bool    g_smoke_fan_active = false;
 
 // Aktif ekran takibi (PTT ile değiştirme için)
 static volatile screen_id_t g_active_screen = SCREEN_IDLE;
@@ -147,12 +155,22 @@ static void smoke_task(void *arg)
 
         g_smoke = adc;
 
-        if (adc >= SMOKE_ADC_FULL)      fan_full();
-        else if (adc >= SMOKE_ADC_HALF) fan_half();
+        // Sadece hedefi yaz — donanıma fast_sensor_task dokunsun
+        if (adc >= SMOKE_ADC_FULL) {
+            g_smoke_fan_active = true;
+            g_fan_target = 65;    // %25
+        } else if (adc >= SMOKE_ADC_HALF) {
+            g_smoke_fan_active = true;
+            g_fan_target = 50;    // %20
+        } else if (adc < SMOKE_ADC_HALF - 200) {
+            g_smoke_fan_active = false;
+            g_fan_target = 0;
+        }
 
-        if (adc >= SMOKE_ADC_HALF) {
+        if (adc >= SMOKE_ADC_FULL) {
             if (++alert_count >= 3 && !in_alert) {
                 in_alert = true;
+                buzzer_on();
                 char msg[32];
                 snprintf(msg, sizeof(msg), "ADC: %d", adc);
                 display_switch(SCREEN_SMOKE_ALERT, msg);
@@ -161,7 +179,12 @@ static void smoke_task(void *arg)
             if (alert_count > 0) alert_count--;
             if (in_alert && adc < SMOKE_ADC_CLEAR) {
                 in_alert = false;
-                display_switch(SCREEN_READY, NULL);
+                buzzer_off();
+                if (g_rfid_scanned) {
+                    display_switch(SCREEN_READY, g_username);
+                } else {
+                    display_switch(SCREEN_IDLE, "Swipe RFID card");
+                }
             }
         }
         vTaskDelay(pdMS_TO_TICKS(500));
@@ -213,30 +236,57 @@ static void fast_sensor_task(void *arg)
 
     bool ptt_prev          = true;   // HIGH = basılmamış
     int  sensor_tick       = 0;      // periyodik ekran güncelleme sayacı
+    bool fire_prev         = false;  // önceki alev durumu (edge detection)
 
     while (1) {
         g_flame = gpio_get_level(FLAME_GPIO);
         g_vib   = gpio_get_level(VIB_GPIO);
 
-        // Sıcaklığa göre otomatik fan (duman alarmı yoksa)
-        if (g_smoke < SMOKE_ADC_HALF) {
-            if (g_temp >= 27) {
-                uint8_t duty = (g_temp >= 35) ? 255 : (uint8_t)((g_temp - 27) * 32);
-                fan_set_duty(duty);
-            } else if (g_temp < 25) {
-                fan_off();
+        // Alev sensörü aktif LOW: 0 = alev var
+        bool fire_now = (g_flame == 0);
+        if (fire_now && !fire_prev) {
+            buzzer_on();
+            display_switch(SCREEN_FIRE_ALERT, "Flame sensor active");
+            g_active_screen = SCREEN_FIRE_ALERT;
+        } else if (!fire_now && fire_prev) {
+            buzzer_off();
+            if (g_rfid_scanned) {
+                display_switch(SCREEN_READY, g_username);
+                g_active_screen = SCREEN_READY;
+            } else {
+                display_switch(SCREEN_IDLE, "Swipe RFID card");
+                g_active_screen = SCREEN_IDLE;
             }
         }
+        fire_prev = fire_now;
 
-        // PTT butonu: falling edge = basıldı
+        // Sıcaklığa göre fan hedefini belirle (duman aktifse üstüne yazma)
+        if (!g_smoke_fan_active) {
+            if (g_temp >= 35) {
+                g_fan_target = 160;
+            } else if (g_temp >= 27) {
+                g_fan_target = (uint8_t)(150 + (g_temp - 27) * 2);
+            } else if (g_temp < 25) {
+                g_fan_target = 0;
+            }
+            // 25-27 arası: g_fan_target değişmez → mevcut hız korunur
+        }
+
+        // ── Tek fan yazma noktası ──────────────────────────────────────
+        static uint8_t fan_applied = 0;
+        if (g_fan_target != fan_applied) {
+            fan_applied = g_fan_target;
+            if (fan_applied == 0) fan_off();
+            else                  fan_set_duty(fan_applied);
+        }
+
+        // PTT butonu: falling edge = basıldı (yalnızca kart okununca aktif)
         bool ptt_now = (bool)gpio_get_level(PTT_GPIO);
-        if (ptt_prev && !ptt_now) {
+        if (ptt_prev && !ptt_now && g_rfid_scanned) {
             if (g_active_screen == SCREEN_SENSORS) {
-                // Sensör ekranındayken PTT → karşılama ekranına dön
                 display_switch(SCREEN_READY, g_username);
                 g_active_screen = SCREEN_READY;
             } else if (g_active_screen == SCREEN_READY) {
-                // Karşılama ekranındayken PTT → sensör ekranına geç
                 refresh_sensors_screen();
             }
         }
@@ -410,6 +460,7 @@ void app_main(void)
     ESP_ERROR_CHECK(ldr_sensor_init());
     ESP_ERROR_CHECK(fan_control_init());
     ESP_ERROR_CHECK(led_strip_init());
+    ESP_ERROR_CHECK(buzzer_init());
 
     // Sensor tasks
     xTaskCreatePinnedToCore(dht11_task,       "dht11",  4096, NULL, 3, NULL, 0);
@@ -426,28 +477,62 @@ void app_main(void)
     display_switch(SCREEN_IDLE, "Swipe RFID card");
     ESP_LOGI(TAG, "Hazır — RFID bekleniyor");
 
+    // UID → İsim eşleştirme tablosu
+    // UID'yi seri monitörden okuyup buraya ekle
+    static const struct { const char *uid; const char *name; } card_map[] = {
+        { "F1B00C07", "Mert Abdullahoglu" },
+        { "635113FD", "Abdul Samed Kara" },
+        // buraya yeni kart ekle
+    };
+
     // Ana döngü: RFID tarama
-    rfid_card_t last_card  = {0};
-    int         rfid_fails = 0;
+    rfid_card_t logged_card  = {0};  // giriş yapan kartı takip et
+    int         rfid_fails   = 0;
+    bool        card_present = false;
 
     while (1) {
         rfid_card_t card;
         if (rfid_poll(&card)) {
             rfid_fails = 0;
-            if (!rfid_uid_equal(&card, &last_card)) {
-                last_card = card;
+            if (!card_present) {
+                // Yeni kart algılandı (önceki yoktu)
+                card_present = true;
                 char uid[32];
                 rfid_uid_to_str(&card, uid, sizeof(uid));
                 ESP_LOGI(TAG, "Kart: %s", uid);
 
-                // Bilinen kartlar burada eşleştirilebilir
-                // Şimdilik UID'yi doğrudan kullanıcı adı olarak sakla
-                snprintf(g_username, sizeof(g_username), "%s", uid);
+                // Aynı kart tekrar okutuldu → çıkış
+                if (g_rfid_scanned && rfid_uid_equal(&card, &logged_card)) {
+                    g_rfid_scanned = false;
+                    memset(&logged_card, 0, sizeof(logged_card));
+                    ESP_LOGI(TAG, "Cikis: %s", g_username);
+                    display_switch(SCREEN_IDLE, "Swipe RFID card");
+                    g_active_screen = SCREEN_IDLE;
+                    vTaskDelay(pdMS_TO_TICKS(200));
+                    continue;
+                }
+
+                // Oturum açıkken farklı kart → yoksay
+                if (g_rfid_scanned) {
+                    ESP_LOGI(TAG, "Oturum acik, kart reddedildi");
+                    vTaskDelay(pdMS_TO_TICKS(200));
+                    continue;
+                }
+
+                const char *name = NULL;
+                for (int i = 0; i < sizeof(card_map) / sizeof(card_map[0]); i++) {
+                    if (strcmp(uid, card_map[i].uid) == 0) {
+                        name = card_map[i].name;
+                        break;
+                    }
+                }
+                snprintf(g_username, sizeof(g_username), "%s", name ? name : uid);
+                logged_card    = card;
                 g_rfid_scanned = true;
 
                 // 1) Kart okundu ekranı
                 char msg[80];
-                snprintf(msg, sizeof(msg), "Welcome!\n%s", uid);
+                snprintf(msg, sizeof(msg), "Welcome!\n%s", g_username);
                 display_switch(SCREEN_RFID_READ, msg);
                 g_active_screen = SCREEN_RFID_READ;
                 vTaskDelay(pdMS_TO_TICKS(2000));
@@ -457,6 +542,7 @@ void app_main(void)
                 g_active_screen = SCREEN_READY;
             }
         } else {
+            card_present = false;  // kart çekildi, tekrar okutmaya hazır
             if (++rfid_fails >= 5) { rfid_fails = 0; rfid_init(); }
         }
         vTaskDelay(pdMS_TO_TICKS(200));
