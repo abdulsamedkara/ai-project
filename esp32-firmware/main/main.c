@@ -113,8 +113,8 @@ static volatile screen_id_t g_active_screen = SCREEN_IDLE;
 static void refresh_sensors_screen(void)
 {
     char msg[48];
-    snprintf(msg, sizeof(msg), "%d %d %d %d %d",
-             g_temp, g_hum, g_smoke, g_flame, g_ldr);
+    snprintf(msg, sizeof(msg), "%d %d %d %d %d %d",
+             g_temp, g_hum, g_smoke, g_flame, g_ldr, g_vib);
     display_switch(SCREEN_SENSORS, msg);
     g_active_screen = SCREEN_SENSORS;
 }

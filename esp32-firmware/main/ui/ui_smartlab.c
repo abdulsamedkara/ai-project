@@ -214,45 +214,46 @@ void ui_smartlab_show(screen_id_t id, const char *msg)
     case SCREEN_READY: {
         draw_header("READY", CLR_GREEN);
 
-        lv_obj_t *bg_card = mk_card(scr, 200, 200, CLR_SURF, CLR_GREEN, 16);
+        lv_obj_t *bg_card = mk_card(scr, 210, 210, CLR_SURF, CLR_GREEN, 16);
         lv_obj_set_style_border_opa(bg_card, LV_OPA_30, 0);
         lv_obj_align(bg_card, LV_ALIGN_CENTER, 0, 0);
 
         draw_icon_circle(lv_color_hex(0x0A1F0F), CLR_GREEN,
-                         LV_SYMBOL_OK, CLR_GREEN, -38);
+                         LV_SYMBOL_HOME, CLR_GREEN, -48);
 
-        lv_obj_t *title = mk_lbl(scr, &lv_font_montserrat_20, CLR_WHITE,
-                                  "Access Granted");
-        lv_obj_align(title, LV_ALIGN_CENTER, 0, 22);
+        lv_obj_t *welcome = mk_lbl(scr, &lv_font_montserrat_16, CLR_CYAN,
+                                    "Welcome to SmartLab!");
+        lv_obj_align(welcome, LV_ALIGN_CENTER, 0, 12);
 
-        lv_obj_t *name = mk_lbl(scr, &lv_font_montserrat_16, CLR_GREEN,
-                                  msg ? msg : "");
-        lv_obj_align(name, LV_ALIGN_CENTER, 0, 50);
+        char name_buf[48];
+        snprintf(name_buf, sizeof(name_buf), LV_SYMBOL_OK "  %s", msg ? msg : "User");
+        lv_obj_t *name = mk_lbl(scr, &lv_font_montserrat_20, CLR_WHITE, name_buf);
+        lv_obj_align(name, LV_ALIGN_CENTER, 0, 40);
 
         lv_obj_t *hint = mk_lbl(scr, &lv_font_montserrat_14, CLR_GREY,
-                                  "PTT  →  sensor data");
-        lv_obj_align(hint, LV_ALIGN_CENTER, 0, 75);
+                                  "Press PTT for live sensors");
+        lv_obj_align(hint, LV_ALIGN_CENTER, 0, 72);
 
-        draw_footer(LV_SYMBOL_OK "  Authenticated", CLR_GREEN);
+        draw_footer(LV_SYMBOL_WIFI "  SmartLab  v2.0", CLR_GREEN);
         break;
     }
 
     // Sensors screen: live sensor data grid
-    // msg format: "temp hum smoke pir flame ldr"
+    // msg format: "temp hum smoke flame ldr vib"
     case SCREEN_SENSORS: {
-        int s_temp=0, s_hum=0, s_smoke=0, s_flame=1, s_ldr=0;
-        if (msg) sscanf(msg, "%d %d %d %d %d",
-                        &s_temp, &s_hum, &s_smoke, &s_flame, &s_ldr);
+        int s_temp=0, s_hum=0, s_smoke=0, s_flame=1, s_ldr=0, s_vib=0;
+        if (msg) sscanf(msg, "%d %d %d %d %d %d",
+                        &s_temp, &s_hum, &s_smoke, &s_flame, &s_ldr, &s_vib);
 
         const char *light_str = s_ldr > 3000 ? "BRIGHT"
                                : s_ldr > 1500 ? "DIM" : "DARK";
 
-        const char *labels[5] = {
+        const char *labels[6] = {
             "Temperature", "Humidity", "Smoke ADC",
-            "Light", "Flame"
+            "Light", "Flame", "Vibration"
         };
-        char vals[5][20];
-        lv_color_t colors[5];
+        char vals[6][20];
+        lv_color_t colors[6];
 
         snprintf(vals[0], 20, "%d C",   s_temp);
         colors[0] = (s_temp >= 27) ? CLR_YELLOW : CLR_GREEN;
@@ -270,14 +271,17 @@ void ui_smartlab_show(screen_id_t id, const char *msg)
         snprintf(vals[4], 20, "%s",     (s_flame == 0) ? "FIRE!" : "SAFE");
         colors[4] = (s_flame == 0) ? CLR_RED : CLR_GREEN;
 
+        snprintf(vals[5], 20, "%s",     (s_vib == 1) ? "ACTIVE" : "NONE");
+        colors[5] = (s_vib == 1) ? CLR_YELLOW : CLR_GREEN;
+
         draw_header("SENSORS", CLR_CYAN);
 
-        for (int i = 0; i < 5; i++) {
-            int y = 44 + i * 50;
+        for (int i = 0; i < 6; i++) {
+            int y = 42 + i * 44;
 
             // Alternating row background
             if (i % 2 == 0) {
-                lv_obj_t *bg = mk_box(scr, 240, 42, CLR_SURF, 0);
+                lv_obj_t *bg = mk_box(scr, 240, 38, CLR_SURF, 0);
                 lv_obj_align(bg, LV_ALIGN_TOP_MID, 0, y);
             }
 
@@ -286,14 +290,14 @@ void ui_smartlab_show(screen_id_t id, const char *msg)
             lv_obj_set_style_text_color(lbl, CLR_GREY, 0);
             lv_obj_set_style_bg_opa(lbl, LV_OPA_TRANSP, 0);
             lv_label_set_text(lbl, labels[i]);
-            lv_obj_align(lbl, LV_ALIGN_TOP_LEFT, 14, y + 14);
+            lv_obj_align(lbl, LV_ALIGN_TOP_LEFT, 14, y + 12);
 
             lv_obj_t *val = lv_label_create(scr);
             lv_obj_set_style_text_font(val, &lv_font_montserrat_14, 0);
             lv_obj_set_style_text_color(val, colors[i], 0);
             lv_obj_set_style_bg_opa(val, LV_OPA_TRANSP, 0);
             lv_label_set_text(val, vals[i]);
-            lv_obj_align(val, LV_ALIGN_TOP_RIGHT, -14, y + 14);
+            lv_obj_align(val, LV_ALIGN_TOP_RIGHT, -14, y + 12);
         }
         break;
     }
