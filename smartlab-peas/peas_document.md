@@ -2,8 +2,8 @@
 ## PEAS Framework Analysis
 
 **Course:** Artificial Intelligence — RTEU Computer Engineering  
-**Students:** Abdül Samed Kara (211401065) | Mert Abdullahoğlu (221401005)  
-**Lecturer:** Assoc. Prof. Yıldıran Yılmaz  
+**Lecturer:** Dr. Joseph Bamidele Awotunde  
+**Students:** Şevval Asi (221401026) | Durdane Naz Babaoğlu (221401028) | Mert Abdullahoğlu (221401005) | Abdul Samed Kara (211401065)  
 
 ---
 
