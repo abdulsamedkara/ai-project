@@ -158,10 +158,10 @@ static void smoke_task(void *arg)
         // Sadece hedefi yaz — donanıma fast_sensor_task dokunsun
         if (adc >= SMOKE_ADC_FULL) {
             g_smoke_fan_active = true;
-            g_fan_target = 65;    // %25
+            g_fan_target = 160;   // 35°C eşdeğeri
         } else if (adc >= SMOKE_ADC_HALF) {
             g_smoke_fan_active = true;
-            g_fan_target = 50;    // %20
+            g_fan_target = 152;   // 28°C eşdeğeri
         } else if (adc < SMOKE_ADC_HALF - 200) {
             g_smoke_fan_active = false;
             g_fan_target = 0;
@@ -177,7 +177,7 @@ static void smoke_task(void *arg)
             }
         } else {
             if (alert_count > 0) alert_count--;
-            if (in_alert && adc < SMOKE_ADC_CLEAR) {
+            if (in_alert && adc < SMOKE_ADC_FULL) {
                 in_alert = false;
                 buzzer_off();
                 if (g_rfid_scanned) {
